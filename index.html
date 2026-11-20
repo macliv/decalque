@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Desenho na Folha - Câmera Lúcida</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: rgba(18, 21, 28, 0.82);
+      --border: rgba(255, 255, 255, 0.14);
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* TELA INICIAL */
+    #homeScreen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow-y: auto;
+      background: radial-gradient(circle at top, #1b2232 0%, #0f1115 70%);
+      z-index: 50;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: rgba(24, 28, 38, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    }
+
+    .card h1 {
+      margin: 0 0 6px;
+      font-size: 1.4rem;
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .steps {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      font-size: 0.86rem;
+      line-height: 1.45;
+      color: #d1d5db;
+    }
+
+    .steps ol {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .steps li + li {
+      margin-top: 6px;
+    }
+
+    .btn-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    button, .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 12px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s, transform 0.1s, border-color 0.15s;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .btn-success {
+      background: var(--success);
+      border-color: transparent;
+      color: #06281e;
+    }
+
+    .btn-warn {
+      background: var(--warn);
+      border-color: transparent;
+      color: #1f1400;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .btn-sm {
+      padding: 8px 11px;
+      font-size: 0.82rem;
+      border-radius: 10px;
+    }
+
+    #imagePreviewBox {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      margin-top: 14px;
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+    }
+
+    #previewThumb {
+      width: 54px;
+      height: 54px;
+      object-fit: contain;
+      background: #000;
+      border-radius: 8px;
+    }
+
+    #previewName {
+      font-size: 0.85rem;
+      color: #e5e7eb;
+      word-break: break-word;
+    }
+
+    #homeError {
+      display: none;
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(239, 68, 68, 0.16);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #fecaca;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    /* TELA DA CÂMERA */
+    #cameraScreen {
+      position: fixed;
+      inset: 0;
+      display: none;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #stage {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #world {
+      position: absolute;
+      inset: 0;
+      transform-origin: center center;
+      will-change: transform;
+    }
+
+    #cameraVideo {
+      position: absolute;
+      pointer-events: none;
+      background: #000;
+    }
+
+    #refWrap {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 0;
+      height: 0;
+      transform-origin: 0 0;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    #refImage {
+      display: none;
+      max-width: 78vw;
+      max-height: 78vh;
+      transform: translate(-50%, -50%);
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    #overlayCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* BARRA SUPERIOR */
+    #topBar {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      left: 10px;
+      right: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    #topBar > * {
+      pointer-events: auto;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .badge.locked {
+      background: rgba(16, 185, 129, 0.22);
+      border-color: rgba(16, 185, 129, 0.6);
+      color: #a7f3d0;
+    }
+
+    .badge.lost {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: rgba(239, 68, 68, 0.7);
+      color: #fecaca;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* AVISOS NO CENTRO/TOPO */
+    #trackingWarning {
+      position: fixed;
+      top: calc(max(10px, env(safe-area-inset-top)) + 44px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 22;
+      display: none;
+      max-width: calc(100vw - 24px);
+      padding: 9px 14px;
+      border-radius: 12px;
+      background: rgba(220, 38, 38, 0.9);
+      color: #fff;
+      font-size: 0.84rem;
+      font-weight: 600;
+      text-align: center;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    #manualHint {
+      position: fixed;
+      top: calc(max(10px, env(safe-area-inset-top)) + 44px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 23;
+      display: none;
+      max-width: calc(100vw - 24px);
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(37, 99, 235, 0.94);
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    /* PAINEL DE CONTROLES INFERIOR */
+    #controlsPanel {
+      position: fixed;
+      left: 10px;
+      right: 10px;
+      bottom: max(10px, env(safe-area-inset-bottom));
+      z-index: 20;
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      max-height: 48vh;
+      overflow-y: auto;
+    }
+
+    .mode-note {
+      font-size: 0.76rem;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .sliders-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+    }
+
+    .slider-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .slider-item.full {
+      grid-column: 1 / -1;
+    }
+
+    .slider-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.76rem;
+      color: #d1d5db;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin: 0;
+      accent-color: var(--primary);
+      height: 22px;
+    }
+
+    #btnShowPanel {
+      position: fixed;
+      right: 12px;
+      bottom: max(14px, env(safe-area-inset-bottom));
+      z-index: 25;
+      display: none;
+      background: rgba(18, 21, 28, 0.72);
+      backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      font-size: 0.84rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TELA INICIAL -->
+  <section id="homeScreen">
+    <div class="card">
+      <h1>Desenho na Folha</h1>
+      <p class="subtitle">
+        Use a câmera traseira como câmera lúcida com fixação por 4 quadrados pretos na folha.
+      </p>
+
+      <div class="steps">
+        <ol>
+          <li>Escolha a imagem de referência da sua galeria.</li>
+          <li>Posicione a folha sob o celular e desenhe <strong>4 quadrados pretos</strong> (um em cada canto da folha).</li>
+          <li>Alinhe a imagem por cima da folha e toque em <strong>Travar na folha</strong>.</li>
+          <li>Depois de travar, dê zoom e mova a tela: <strong>a folha e o desenho se movem juntos</strong>.</li>
+        </ol>
+      </div>
+
+      <div class="btn-stack">
+        <button id="btnChooseImage" type="button">Escolher imagem</button>
+        <button id="btnOpenCamera" class="btn-primary" type="button">Abrir câmera</button>
+      </div>
+
+      <input id="fileInput" type="file" accept="image/*" hidden />
+
+      <div id="imagePreviewBox">
+        <img id="previewThumb" alt="Prévia" />
+        <div id="previewName"></div>
+      </div>
+
+      <div id="homeError"></div>
+    </div>
+  </section>
+
+  <!-- TELA DA CÂMERA -->
+  <section id="cameraScreen">
+    <div id="stage">
+      <div id="world">
+        <video id="cameraVideo" autoplay playsinline muted></video>
+        <div id="refWrap">
+          <img id="refImage" alt="Referência" />
+        </div>
+        <canvas id="overlayCanvas"></canvas>
+      </div>
+    </div>
+
+    <div id="topBar">
+      <div class="badges">
+        <span id="statusBadge" class="badge">Modo livre (ajuste o desenho)</span>
+        <span id="wakeBadge" class="badge" style="display:none;">Tela ligada</span>
+      </div>
+      <div class="top-actions">
+        <button id="btnChangeImage" class="btn-sm" type="button">Imagem</button>
+        <button id="btnTogglePanel" class="btn-sm" type="button">Ocultar</button>
+      </div>
+    </div>
+
+    <div id="trackingWarning"></div>
+    <div id="manualHint"></div>
+
+    <div id="controlsPanel">
+      <div id="modeNote" class="mode-note">
+        1 dedo move o desenho • 2 dedos dão zoom e giram o desenho
+      </div>
+
+      <div class="action-row">
+        <button id="btnLock" class="btn-success btn-sm" type="button">Travar na folha</button>
+        <button id="btnManualCorners" class="btn-sm" type="button">4 Cantos</button>
+        <button id="btnCenter" class="btn-sm" type="button">Centralizar</button>
+      </div>
+
+      <div class="sliders-grid">
+        <div class="slider-item">
+          <div class="slider-head">
+            <span>Opacidade</span>
+            <span id="valOpacity">50%</span>
+          </div>
+          <input id="sliderOpacity" type="range" min="0" max="100" value="50" />
+        </div>
+
+        <div class="slider-item">
+          <div class="slider-head">
+            <span id="labelZoom">Zoom desenho</span>
+            <span id="valZoom">1.00x</span>
+          </div>
+          <input id="sliderZoom" type="range" min="20" max="400" value="100" />
+        </div>
+
+        <div class="slider-item">
+          <div class="slider-head">
+            <span id="labelX">Posição X</span>
+            <span id="valX">0 px</span>
+          </div>
+          <input id="sliderX" type="range" min="-500" max="500" value="0" />
+        </div>
+
+        <div class="slider-item">
+          <div class="slider-head">
+            <span id="labelY">Posição Y</span>
+            <span id="valY">0 px</span>
+          </div>
+          <input id="sliderY" type="range" min="-500" max="500" value="0" />
+        </div>
+
+        <div id="camZoomGroup" class="slider-item full" style="display:none;">
+          <div class="slider-head">
+            <span>Zoom da câmera</span>
+            <span id="valCamZoom">1.0x</span>
+          </div>
+          <input id="sliderCamZoom" type="range" min="1" max="5" step="0.1" value="1" />
+        </div>
+      </div>
+    </div>
+
+    <button id="btnShowPanel" type="button">Mostrar painel</button>
+  </section>
+
+  <script>
+    (() => {
+      // Elementos
+      const homeScreen = document.getElementById('homeScreen');
+      const cameraScreen = document.getElementById('cameraScreen');
+      const fileInput = document.getElementById('fileInput');
+      const btnChooseImage = document.getElementById('btnChooseImage');
+      const btnChangeImage = document.getElementById('btnChangeImage');
+      const btnOpenCamera = document.getElementById('btnOpenCamera');
+      const imagePreviewBox = document.getElementById('imagePreviewBox');
+      const previewThumb = document.getElementById('previewThumb');
+      const previewName = document.getElementById('previewName');
+      const homeError = document.getElementById('homeError');
+
+      const stage = document.getElementById('stage');
+      const world = document.getElementById('world');
+      const cameraVideo = document.getElementById('cameraVideo');
+      const refWrap = document.getElementById('refWrap');
+      const refImage = document.getElementById('refImage');
+      const overlayCanvas = document.getElementById('overlayCanvas');
+      const overlayCtx = overlayCanvas.getContext('2d');
+
+      const statusBadge = document.getElementById('statusBadge');
+      const wakeBadge = document.getElementById('wakeBadge');
+      const trackingWarning = document.getElementById('trackingWarning');
+      const manualHint = document.getElementById('manualHint');
+      const modeNote = document.getElementById('modeNote');
+
+      const controlsPanel = document.getElementById('controlsPanel');
+      const btnTogglePanel = document.getElementById('btnTogglePanel');
+      const btnShowPanel = document.getElementById('btnShowPanel');
+      const btnLock = document.getElementById('btnLock');
+      const btnManualCorners = document.getElementById('btnManualCorners');
+      const btnCenter = document.getElementById('btnCenter');
+
+      const sliderOpacity = document.getElementById('sliderOpacity');
+      const valOpacity = document.getElementById('valOpacity');
+      const sliderZoom = document.getElementById('sliderZoom');
+      const valZoom = document.getElementById('valZoom');
+      const labelZoom = document.getElementById('labelZoom');
+      const sliderX = document.getElementById('sliderX');
+      const valX = document.getElementById('valX');
+      const labelX = document.getElementById('labelX');
+      const sliderY = document.getElementById('sliderY');
+      const valY = document.getElementById('valY');
+      const labelY = document.getElementById('labelY');
+
+      const camZoomGroup = document.getElementById('camZoomGroup');
+      const sliderCamZoom = document.getElementById('sliderCamZoom');
+      const valCamZoom = document.getElementById('valCamZoom');
+
+      // Estado da mídia e wake lock
+      let mediaStream = null;
+      let videoTrack = null;
+      let wakeLock = null;
+      let currentImageUrl = null;
+
+      // Geometria do vídeo na tela (cover exato)
+      let stageW = 0, stageH = 0;
+      let videoW = 0, videoH = 0;
+      let coverScale = 1;
+
+      // Estado base da imagem de referência (relativo ao centro do stage)
+      const refBase = { x: 0, y: 0, scale: 1, rotation: 0, opacity: 0.5 };
+      // Estado exibido (inclui deslocamento do tracking quando travado)
+      const refLive = { x: 0, y: 0, scale: 1, rotation: 0 };
+
+      // Estado da visualização conjunta (#world) após travar
+      const view = { x: 0, y: 0, scale: 1 };
+
+      // Estado do tracking dos 4 quadrados pretos
+      let isLocked = false;
+      let trackingLost = false;
+      let manualPicking = false;
+      let manualPickedVideoPts = [];
+      let markers = []; // { initStageX, initStageY, vidX, vidY, curStageX, curStageY, patch, valid }
+      let rafId = null;
+      let lastTrackTime = 0;
+
+      // Canvas reduzido para visão computacional
+      const trackCanvas = document.createElement('canvas');
+      const trackCtx = trackCanvas.getContext('2d', { willReadFrequently: true });
+      const TRACK_W = 320;
+      let trackH = 240;
+
+      // ========================
+      // 1. ESCOLHA DE IMAGEM
+      // ========================
+      btnChooseImage.addEventListener('click', () => fileInput.click());
+      btnChangeImage.addEventListener('click', () => fileInput.click());
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        if (currentImageUrl) URL.revokeObjectURL(currentImageUrl);
+        currentImageUrl = URL.createObjectURL(file);
+
+        previewThumb.src = currentImageUrl;
+        previewName.textContent = file.name;
+        imagePreviewBox.style.display = 'flex';
+
+        refImage.src = currentImageUrl;
+        refImage.style.display = 'block';
+        homeError.style.display = 'none';
+      });
+
+      // ========================
+      // 2. CÂMERA & WAKE LOCK
+      // ========================
+      async function requestWakeLock() {
+        if (!('wakeLock' in navigator)) return;
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeBadge.style.display = 'inline-block';
+          wakeLock.addEventListener('release', () => {
+            wakeBadge.style.display = 'none';
+          });
+        } catch (_) {
+          // Alguns dispositivos ou modos de economia bloqueiam wakeLock
+        }
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && cameraScreen.style.display === 'block') {
+          requestWakeLock();
+        }
+      });
+
+      function showCameraError(err) {
+        let msg = 'Não foi possível abrir a câmera.';
+        if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+          msg = 'A câmera exige conexão segura (HTTPS) ou localhost. Abra o arquivo através de um servidor HTTPS.';
+        } else if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          msg = 'Este navegador não suporta acesso à câmera (getUserMedia indisponível).';
+        } else if (err) {
+          switch (err.name) {
+            case 'NotAllowedError':
+            case 'PermissionDeniedError':
+              msg = 'Permissão da câmera negada. Autorize o acesso à câmera nas configurações do navegador e tente novamente.';
+              break;
+            case 'NotFoundError':
+            case 'DevicesNotFoundError':
+              msg = 'Nenhuma câmera traseira foi encontrada neste dispositivo.';
+              break;
+            case 'NotReadableError':
+            case 'TrackStartError':
+              msg = 'A câmera já está sendo usada por outro aplicativo. Feche o outro app e tente novamente.';
+              break;
+            case 'OverconstrainedError':
+              msg = 'As configurações solicitadas não são suportadas pela câmera do aparelho.';
+              break;
+            default:
+              msg = `Erro ao abrir a câmera: ${err.message || err.name}`;
+          }
+        }
+        homeError.textContent = msg;
+        homeError.style.display = 'block';
+      }
+
+      btnOpenCamera.addEventListener('click', async () => {
+        homeError.style.display = 'none';
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showCameraError(null);
+          return;
+        }
+
+        try {
+          // Tenta câmera traseira preferencialmente
+          try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+              },
+              audio: false
+            });
+          } catch (firstErr) {
+            if (firstErr.name === 'OverconstrainedError') {
+              mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' },
+                audio: false
+              });
+            } else {
+              throw firstErr;
+            }
+          }
+
+          cameraVideo.srcObject = mediaStream;
+          await cameraVideo.play();
+
+          videoTrack = mediaStream.getVideoTracks()[0];
+          setupHardwareZoom();
+
+          homeScreen.style.display = 'none';
+          cameraScreen.style.display = 'block';
+
+          updateLayout();
+          syncSlidersFromState();
+          applyTransforms();
+          requestWakeLock();
+          startLoop();
+        } catch (err) {
+          showCameraError(err);
+        }
+      });
+
+      function setupHardwareZoom() {
+        camZoomGroup.style.display = 'none';
+        if (!videoTrack || typeof videoTrack.getCapabilities !== 'function') return;
+        const caps = videoTrack.getCapabilities();
+        if (caps && caps.zoom && typeof caps.zoom.min === 'number' && typeof caps.zoom.max === 'number' && caps.zoom.max > caps.zoom.min) {
+          camZoomGroup.style.display = 'flex';
+          sliderCamZoom.min = caps.zoom.min;
+          sliderCamZoom.max = caps.zoom.max;
+          sliderCamZoom.step = caps.zoom.step || 0.1;
+          const settings = videoTrack.getSettings ? videoTrack.getSettings() : {};
+          const curZoom = settings.zoom || caps.zoom.min;
+          sliderCamZoom.value = curZoom;
+          valCamZoom.textContent = `${Number(curZoom).toFixed(1)}x`;
+        }
+      }
+
+      sliderCamZoom.addEventListener('input', async () => {
+        const z = parseFloat(sliderCamZoom.value);
+        valCamZoom.textContent = `${z.toFixed(1)}x`;
+        if (videoTrack) {
+          try {
+            await videoTrack.applyConstraints({ advanced: [{ zoom: z }] });
+          } catch (_) {}
+        }
+      });
+
+      // ========================
+      // 3. LAYOUT E COORDENADAS
+      // ========================
+      function updateLayout() {
+        stageW = stage.clientWidth || window.innerWidth;
+        stageH = stage.clientHeight || window.innerHeight;
+        overlayCanvas.width = stageW;
+        overlayCanvas.height = stageH;
+
+        videoW = cameraVideo.videoWidth || 1280;
+        videoH = cameraVideo.videoHeight || 720;
+
+        coverScale = Math.max(stageW / videoW, stageH / videoH);
+        const dispW = videoW * coverScale;
+        const dispH = videoH * coverScale;
+
+        cameraVideo.style.width = `${dispW}px`;
+        cameraVideo.style.height = `${dispH}px`;
+        cameraVideo.style.left = `${(stageW - dispW) / 2}px`;
+        cameraVideo.style.top = `${(stageH - dispH) / 2}px`;
+
+        trackH = Math.max(120, Math.round(TRACK_W * (videoH / videoW)));
+        trackCanvas.width = TRACK_W;
+        trackCanvas.height = trackH;
+      }
+
+      cameraVideo.addEventListener('loadedmetadata', updateLayout);
+      window.addEventListener('resize', updateLayout);
+
+      // Conversões entre espaços: Video reduzido (track) <-> Stage (#world) <-> Tela (client)
+      function trackToStage(tx, ty) {
+        const vx = (tx / TRACK_W) * videoW;
+        const vy = (ty / trackH) * videoH;
+        return {
+          x: (vx - videoW / 2) * coverScale + stageW / 2,
+          y: (vy - videoH / 2) * coverScale + stageH / 2
+        };
+      }
+
+      function stageToTrack(sx, sy) {
+        const vx = (sx - stageW / 2) / coverScale + videoW / 2;
+        const vy = (sy - stageH / 2) / coverScale + videoH / 2;
+        return {
+          x: (vx / videoW) * TRACK_W,
+          y: (vy / videoH) * TRACK_H
+        };
+      }
+
+      function clientToStage(cx, cy) {
+        const rect = stage.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        return {
+          x: (cx - centerX - view.x) / view.scale + rect.width / 2,
+          y: (cy - centerY - view.y) / view.scale + rect.height / 2
+        };
+      }
+
+      // ========================
+      // 4. TRANSFORMAÇÕES E CONTROLES
+      // ========================
+      function applyTransforms() {
+        refImage.style.opacity = refBase.opacity;
+
+        const r = isLocked ? refLive : refBase;
+        refWrap.style.transform = `translate(${r.x}px, ${r.y}px) rotate(${r.rotation}rad) scale(${r.scale})`;
+
+        world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+      }
+
+      function clampView() {
+        const maxX = stageW * 0.65 * view.scale + 100;
+        const maxY = stageH * 0.65 * view.scale + 100;
+        view.x = Math.max(-maxX, Math.min(maxX, view.x));
+        view.y = Math.max(-maxY, Math.min(maxY, view.y));
+        view.scale = Math.max(1, Math.min(5, view.scale));
+      }
+
+      function syncSlidersFromState() {
+        sliderOpacity.value = Math.round(refBase.opacity * 100);
+        valOpacity.textContent = `${Math.round(refBase.opacity * 100)}%`;
+
+        if (!isLocked) {
+          labelZoom.textContent = 'Zoom desenho';
+          labelX.textContent = 'Posição X';
+          labelY.textContent = 'Posição Y';
+
+          sliderZoom.min = 20;
+          sliderZoom.max = 400;
+          sliderZoom.value = Math.round(refBase.scale * 100);
+          valZoom.textContent = `${refBase.scale.toFixed(2)}x`;
+
+          sliderX.min = -500;
+          sliderX.max = 500;
+          sliderX.value = Math.round(refBase.x);
+          valX.textContent = `${Math.round(refBase.x)} px`;
+
+          sliderY.min = -500;
+          sliderY.max = 500;
+          sliderY.value = Math.round(refBase.y);
+          valY.textContent = `${Math.round(refBase.y)} px`;
+        } else {
+          labelZoom.textContent = 'Zoom folha+desenho';
+          labelX.textContent = 'Mover juntos X';
+          labelY.textContent = 'Mover juntos Y';
+
+          sliderZoom.min = 100;
+          sliderZoom.max = 500;
+          sliderZoom.value = Math.round(view.scale * 100);
+          valZoom.textContent = `${view.scale.toFixed(2)}x`;
+
+          const limX = Math.round(stageW * 0.65 * view.scale + 100);
+          const limY = Math.round(stageH * 0.65 * view.scale + 100);
+          sliderX.min = -limX;
+          sliderX.max = limX;
+          sliderX.value = Math.round(view.x);
+          valX.textContent = `${Math.round(view.x)} px`;
+
+          sliderY.min = -limY;
+          sliderY.max = limY;
+          sliderY.value = Math.round(view.y);
+          valY.textContent = `${Math.round(view.y)} px`;
+        }
+      }
+
+      sliderOpacity.addEventListener('input', () => {
+        refBase.opacity = parseInt(sliderOpacity.value, 10) / 100;
+        valOpacity.textContent = `${sliderOpacity.value}%`;
+        applyTransforms();
+      });
+
+      sliderZoom.addEventListener('input', () => {
+        const s = parseInt(sliderZoom.value, 10) / 100;
+        if (!isLocked) {
+          refBase.scale = s;
+        } else {
+          const factor = s / view.scale;
+          view.x *= factor;
+          view.y *= factor;
+          view.scale = s;
+          clampView();
+        }
+        valZoom.textContent = `${s.toFixed(2)}x`;
+        applyTransforms();
+      });
+
+      sliderX.addEventListener('input', () => {
+        const v = parseInt(sliderX.value, 10);
+        if (!isLocked) refBase.x = v;
+        else { view.x = v; clampView(); }
+        valX.textContent = `${v} px`;
+        applyTransforms();
+      });
+
+      sliderY.addEventListener('input', () => {
+        const v = parseInt(sliderY.value, 10);
+        if (!isLocked) refBase.y = v;
+        else { view.y = v; clampView(); }
+        valY.textContent = `${v} px`;
+        applyTransforms();
+      });
+
+      btnCenter.addEventListener('click', () => {
+        if (!isLocked) {
+          refBase.x = 0;
+          refBase.y = 0;
+          refBase.scale = 1;
+          refBase.rotation = 0;
+        } else {
+          view.x = 0;
+          view.y = 0;
+          view.scale = 1;
+        }
+        syncSlidersFromState();
+        applyTransforms();
+      });
+
+      btnTogglePanel.addEventListener('click', () => {
+        controlsPanel.style.display = 'none';
+        btnShowPanel.style.display = 'inline-flex';
+      });
+
+      btnShowPanel.addEventListener('click', () => {
+        controlsPanel.style.display = 'block';
+        btnShowPanel.style.display = 'none';
+      });
+
+      // ========================
+      // 5. GESTOS NA TELA (1 E 2 DEDOS)
+      // ========================
+      const pointers = new Map();
+      let prevGesture = null;
+
+      function getGestureState() {
+        const pts = Array.from(pointers.values());
+        if (pts.length === 1) {
+          return { count: 1, x: pts[0].x, y: pts[0].y };
+        }
+        if (pts.length >= 2) {
+          const p1 = pts[0], p2 = pts[1];
+          return {
+            count: 2,
+            x: (p1.x + p2.x) / 2,
+            y: (p1.y + p2.y) / 2,
+            dist: Math.hypot(p2.x - p1.x, p2.y - p1.y),
+            angle: Math.atan2(p2.y - p1.y, p2.x - p1.x)
+          };
+        }
+        return null;
+      }
+
+      stage.addEventListener('pointerdown', (e) => {
+        if (manualPicking) {
+          handleManualCornerTap(e.clientX, e.clientY);
+          return;
+        }
+        stage.setPointerCapture(e.pointerId);
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        prevGesture = getGestureState();
+      });
+
+      stage.addEventListener('pointermove', (e) => {
+        if (manualPicking || !pointers.has(e.pointerId)) return;
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const cur = getGestureState();
+        if (!cur || !prevGesture || cur.count !== prevGesture.count) {
+          prevGesture = cur;
+          return;
+        }
+
+        if (!isLocked) {
+          // DESTRAVADO: move/zoom/gira apenas a imagem de referência
+          if (cur.count === 1) {
+            refBase.x += cur.x - prevGesture.x;
+            refBase.y += cur.y - prevGesture.y;
+          } else if (cur.count === 2 && prevGesture.dist > 5) {
+            const scaleFactor = cur.dist / prevGesture.dist;
+            const dAngle = cur.angle - prevGesture.angle;
+
+            const rect = stage.getBoundingClientRect();
+            const pmX = prevGesture.x - (rect.left + rect.width / 2);
+            const pmY = prevGesture.y - (rect.top + rect.height / 2);
+            const cmX = cur.x - (rect.left + rect.width / 2);
+            const cmY = cur.y - (rect.top + rect.height / 2);
+
+            const vx = refBase.x - pmX;
+            const vy = refBase.y - pmY;
+            const cos = Math.cos(dAngle), sin = Math.sin(dAngle);
+
+            refBase.x = cmX + (vx * cos - vy * sin) * scaleFactor;
+            refBase.y = cmY + (vx * sin + vy * cos) * scaleFactor;
+            refBase.scale = Math.max(0.2, Math.min(4.0, refBase.scale * scaleFactor));
+            refBase.rotation += dAngle;
+          }
+        } else {
+          // TRAVADO: move e dá zoom em AMBOS JUNTOS (folha + desenho)
+          if (cur.count === 1) {
+            view.x += cur.x - prevGesture.x;
+            view.y += cur.y - prevGesture.y;
+            clampView();
+          } else if (cur.count === 2 && prevGesture.dist > 5) {
+            const scaleFactor = cur.dist / prevGesture.dist;
+            const newScale = Math.max(1.0, Math.min(5.0, view.scale * scaleFactor));
+            const actualFactor = newScale / view.scale;
+
+            const rect = stage.getBoundingClientRect();
+            const pmX = prevGesture.x - (rect.left + rect.width / 2);
+            const pmY = prevGesture.y - (rect.top + rect.height / 2);
+            const cmX = cur.x - (rect.left + rect.width / 2);
+            const cmY = cur.y - (rect.top + rect.height / 2);
+
+            view.x = cmX - (pmX - view.x) * actualFactor;
+            view.y = cmY - (pmY - view.y) * actualFactor;
+            view.scale = newScale;
+            clampView();
+          }
+        }
+
+        prevGesture = cur;
+        syncSlidersFromState();
+        applyTransforms();
+      });
+
+      function onPointerUp(e) {
+        pointers.delete(e.pointerId);
+        prevGesture = getGestureState();
+      }
+      stage.addEventListener('pointerup', onPointerUp);
+      stage.addEventListener('pointercancel', onPointerUp);
+
+      // ========================
+      // 6. DETECÇÃO E TRACKING DOS 4 QUADRADOS PRETOS
+      // ========================
+      function grabGrayscaleFrame() {
+        trackCtx.drawImage(cameraVideo, 0, 0, TRACK_W, trackH);
+        const imgData = trackCtx.getImageData(0, 0, TRACK_W, trackH).data;
+        const gray = new Uint8Array(TRACK_W * trackH);
+        for (let i = 0, j = 0; i < imgData.length; i += 4, j++) {
+          gray[j] = (imgData[i] * 77 + imgData[i + 1] * 150 + imgData[i + 2] * 29) >> 8;
+        }
+        return gray;
+      }
+
+      function buildIntegral(gray, w, h) {
+        const stride = w + 1;
+        const integ = new Int32Array(stride * (h + 1));
+        for (let y = 1; y <= h; y++) {
+          let rowSum = 0;
+          const gRow = (y - 1) * w;
+          const iRow = y * stride;
+          const pRow = (y - 1) * stride;
+          for (let x = 1; x <= w; x++) {
+            rowSum += gray[gRow + x - 1];
+            integ[iRow + x] = integ[pRow + x] + rowSum;
+          }
+        }
+        return integ;
+      }
+
+      function boxMean(integ, stride, x1, y1, x2, y2) {
+        const a = integ[y1 * stride + x1];
+        const b = integ[y1 * stride + (x2 + 1)];
+        const c = integ[(y2 + 1) * stride + x1];
+        const d = integ[(y2 + 1) * stride + (x2 + 1)];
+        const area = (x2 - x1 + 1) * (y2 - y1 + 1);
+        return (d - b - c + a) / area;
+      }
+
+      function refineSquareCenter(gray, w, h, cx, cy) {
+        const win = 14;
+        const x0 = Math.max(0, Math.round(cx) - win);
+        const y0 = Math.max(0, Math.round(cy) - win);
+        const x1 = Math.min(w - 1, Math.round(cx) + win);
+        const y1 = Math.min(h - 1, Math.round(cy) + win);
+
+        let minV = 255, maxV = 0;
+        for (let y = y0; y <= y1; y++) {
+          for (let x = x0; x <= x1; x++) {
+            const v = gray[y * w + x];
+            if (v < minV) minV = v;
+            if (v > maxV) maxV = v;
+          }
+        }
+        const thresh = minV + (maxV - minV) * 0.42;
+        let sumX = 0, sumY = 0, weightSum = 0;
+        for (let y = y0; y <= y1; y++) {
+          for (let x = x0; x <= x1; x++) {
+            const v = gray[y * w + x];
+            if (v < thresh) {
+              const wt = thresh - v;
+              sumX += x * wt;
+              sumY += y * wt;
+              weightSum += wt;
+            }
+          }
+        }
+        if (weightSum < 1) return { x: cx, y: cy };
+        return { x: sumX / weightSum, y: sumY / weightSum };
+      }
+
+      function extractPatch(gray, w, h, cx, cy, half = 9) {
+        const size = half * 2 + 1;
+        const patch = new Float32Array(size * size);
+        const ix = Math.round(cx);
+        const iy = Math.round(cy);
+        let mean = 0;
+        let idx = 0;
+        for (let dy = -half; dy <= half; dy++) {
+          const y = Math.max(0, Math.min(h - 1, iy + dy));
+          for (let dx = -half; dx <= half; dx++) {
+            const x = Math.max(0, Math.min(w - 1, ix + dx));
+            const val = gray[y * w + x];
+            patch[idx++] = val;
+            mean += val;
+          }
+        }
+        mean /= patch.length;
+        let norm = 0;
+        for (let i = 0; i < patch.length; i++) {
+          patch[i] -= mean;
+          norm += patch[i] * patch[i];
+        }
+        norm = Math.sqrt(norm) || 1;
+        for (let i = 0; i < patch.length; i++) patch[i] /= norm;
+        return { data: patch, half, size };
+      }
+
+      function autoDetectFourSquares(gray) {
+        const w = TRACK_W, h = trackH;
+        const integ = buildIntegral(gray, w, h);
+        const stride = w + 1;
+
+        const rOut = 17;
+        const rIn = 2;
+        const rMid = 8;
+
+        // 4 quadrantes com leve folga de 8% no centro
+        const padX = Math.round(w * 0.08);
+        const padY = Math.round(h * 0.08);
+        const quads = [
+          { x0: rOut + 2, x1: Math.round(w * 0.54), y0: rOut + 2, y1: Math.round(h * 0.54) },
+          { x0: Math.round(w * 0.46), x1: w - rOut - 3, y0: rOut + 2, y1: Math.round(h * 0.54) },
+          { x0: rOut + 2, x1: Math.round(w * 0.54), y0: Math.round(h * 0.46), y1: h - rOut - 3 },
+          { x0: Math.round(w * 0.46), x1: w - rOut - 3, y0: Math.round(h * 0.46), y1: h - rOut - 3 }
+        ];
+
+        const found = [];
+        for (const q of quads) {
+          let bestScore = -1;
+          let bestPt = null;
+
+          for (let y = q.y0; y <= q.y1; y += 2) {
+            for (let x = q.x0; x <= q.x1; x += 2) {
+              const inner = boxMean(integ, stride, x - rIn, y - rIn, x + rIn, y + rIn);
+              if (inner > 135) continue;
+
+              // Verifica se os 4 lados ao redor são claros (elimina borda de mesa escura)
+              const top = boxMean(integ, stride, x - 4, y - rOut, x + 4, y - rMid);
+              const bot = boxMean(integ, stride, x - 4, y + rMid, x + 4, y + rOut);
+              const lft = boxMean(integ, stride, x - rOut, y - 4, x - rMid, y + 4);
+              const rgt = boxMean(integ, stride, x + rMid, y - 4, x + rOut, y + 4);
+
+              const minSide = Math.min(top, bot, lft, rgt);
+              const contrast = minSide - inner;
+              if (contrast < 32 || inner > minSide * 0.72) continue;
+
+              // Evita duplicar ponto muito próximo de outro já escolhido
+              let tooClose = false;
+              for (const fp of found) {
+                if (Math.hypot(x - fp.x, y - fp.y) < Math.min(w, h) * 0.22) {
+                  tooClose = true;
+                  break;
+                }
+              }
+              if (tooClose) continue;
+
+              const score = contrast * (1 - inner / 255);
+              if (score > bestScore) {
+                bestScore = score;
+                bestPt = { x, y };
+              }
+            }
+          }
+
+          if (bestPt) {
+            const refined = refineSquareCenter(gray, w, h, bestPt.x, bestPt.y);
+            found.push(refined);
+          }
+        }
+
+        if (found.length < 4) return null;
+        // Ordena como TL, TR, BR, BL para consistência visual
+        found.sort((a, b) => a.y - b.y);
+        const topTwo = found.slice(0, 2).sort((a, b) => a.x - b.x);
+        const botTwo = found.slice(2, 4).sort((a, b) => b.x - a.x);
+        return [topTwo[0], topTwo[1], botTwo[0], botTwo[1]];
+      }
+
+      function initMarkersFromTrackPoints(pts, gray) {
+        markers = pts.map((pt) => {
+          const st = trackToStage(pt.x, pt.y);
+          return {
+            initStageX: st.x,
+            initStageY: st.y,
+            curStageX: st.x,
+            curStageY: st.y,
+            vidX: pt.x,
+            vidY: pt.y,
+            patch: extractPatch(gray, TRACK_W, trackH, pt.x, pt.y, 9),
+            valid: true
+          };
+        });
+
+        refLive.x = refBase.x;
+        refLive.y = refBase.y;
+        refLive.scale = refBase.scale;
+        refLive.rotation = refBase.rotation;
+
+        isLocked = true;
+        trackingLost = false;
+        trackingWarning.style.display = 'none';
+        updateLockUI();
+        syncSlidersFromState();
+        applyTransforms();
+      }
+
+      function unlockAndKeepPosition() {
+        if (!isLocked) return;
+        // Ao destravar, mantém a referência na posição atual
+        refBase.x = refLive.x;
+        refBase.y = refLive.y;
+        refBase.scale = refLive.scale;
+        refBase.rotation = refLive.rotation;
+
+        // Volta o zoom conjunto para 1x para retomar o ajuste livre na tela cheia
+        view.x = 0;
+        view.y = 0;
+        view.scale = 1;
+
+        isLocked = false;
+        trackingLost = false;
+        markers = [];
+        trackingWarning.style.display = 'none';
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+        updateLockUI();
+        syncSlidersFromState();
+        applyTransforms();
+      }
+
+      function updateLockUI() {
+        if (isLocked) {
+          btnLock.textContent = 'Destravar';
+          btnLock.className = 'btn-warn btn-sm';
+          statusBadge.textContent = trackingLost ? 'Rastreamento perdido!' : 'Travado na folha (4 pontos)';
+          statusBadge.className = trackingLost ? 'badge lost' : 'badge locked';
+          modeNote.textContent = 'Travado: 1 dedo move folha + desenho • 2 dedos dão zoom juntos';
+        } else {
+          btnLock.textContent = 'Travar na folha';
+          btnLock.className = 'btn-success btn-sm';
+          statusBadge.textContent = 'Modo livre (ajuste o desenho)';
+          statusBadge.className = 'badge';
+          modeNote.textContent = '1 dedo move o desenho • 2 dedos dão zoom e giram o desenho';
+        }
+      }
+
+      btnLock.addEventListener('click', () => {
+        if (isLocked) {
+          unlockAndKeepPosition();
+          return;
+        }
+        if (manualPicking) {
+          cancelManualPicking();
+          return;
+        }
+        const gray = grabGrayscaleFrame();
+        const detected = autoDetectFourSquares(gray);
+        if (detected) {
+          initMarkersFromTrackPoints(detected, gray);
+        } else {
+          // Não achou os 4 automaticamente -> inicia marcação manual guiada
+          startManualPicking('Não detectei os 4 quadrados automaticamente. Toque no quadrado 1/4.');
+        }
+      });
+
+      // Modo manual de marcação dos 4 cantos
+      const cornerLabels = [
+        'quadrado 1/4 (canto superior esquerdo)',
+        'quadrado 2/4 (canto superior direito)',
+        'quadrado 3/4 (canto inferior direito)',
+        'quadrado 4/4 (canto inferior esquerdo)'
+      ];
+
+      function startManualPicking(prefix) {
+        if (isLocked) unlockAndKeepPosition();
+        manualPicking = true;
+        manualPickedVideoPts = [];
+        manualHint.textContent = prefix || `Toque no ${cornerLabels[0]}`;
+        manualHint.style.display = 'block';
+        btnManualCorners.classList.add('btn-primary');
+      }
+
+      function cancelManualPicking() {
+        manualPicking = false;
+        manualPickedVideoPts = [];
+        manualHint.style.display = 'none';
+        btnManualCorners.classList.remove('btn-primary');
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+      }
+
+      btnManualCorners.addEventListener('click', () => {
+        if (manualPicking) cancelManualPicking();
+        else startManualPicking(`Toque no ${cornerLabels[0]}`);
+      });
+
+      function handleManualCornerTap(clientX, clientY) {
+        const st = clientToStage(clientX, clientY);
+        const tr = stageToTrack(st.x, st.y);
+        const gray = grabGrayscaleFrame();
+        const refined = refineSquareCenter(gray, TRACK_W, trackH, tr.x, tr.y);
+        manualPickedVideoPts.push(refined);
+
+        if (manualPickedVideoPts.length < 4) {
+          manualHint.textContent = `Toque no ${cornerLabels[manualPickedVideoPts.length]}`;
+        } else {
+          const pts = manualPickedVideoPts.slice();
+          cancelManualPicking();
+          initMarkersFromTrackPoints(pts, gray);
+        }
+      }
+
+      // ========================
+      // 7. TRACKING FRAME A FRAME
+      // ========================
+      function nccAt(gray, w, h, cx, cy, patchObj) {
+        const { data: p, half, size } = patchObj;
+        const ix = Math.round(cx);
+        const iy = Math.round(cy);
+        if (ix - half < 0 || iy - half < 0 || ix + half >= w || iy + half >= h) return -1;
+
+        let mean = 0;
+        const n = size * size;
+        for (let dy = -half; dy <= half; dy++) {
+          const row = (iy + dy) * w + (ix - half);
+          for (let dx = 0; dx < size; dx++) {
+            mean += gray[row + dx];
+          }
+        }
+        mean /= n;
+
+        let dot = 0, norm = 0, idx = 0;
+        for (let dy = -half; dy <= half; dy++) {
+          const row = (iy + dy) * w + (ix - half);
+          for (let dx = 0; dx < size; dx++) {
+            const v = gray[row + dx] - mean;
+            dot += v * p[idx++];
+            norm += v * v;
+          }
+        }
+        if (norm < 1e-4) return -1;
+        return dot / Math.sqrt(norm);
+      }
+
+      function trackSingleMarker(gray, m) {
+        const w = TRACK_W, h = trackH;
+        const radius = 26;
+        const minX = Math.max(m.patch.half, Math.round(m.vidX - radius));
+        const maxX = Math.min(w - m.patch.half - 1, Math.round(m.vidX + radius));
+        const minY = Math.max(m.patch.half, Math.round(m.vidY - radius));
+        const maxY = Math.min(h - m.patch.half - 1, Math.round(m.vidY + radius));
+
+        let bestScore = -1, bx = m.vidX, by = m.vidY;
+        // Busca grossa (passo 3px)
+        for (let y = minY; y <= maxY; y += 3) {
+          for (let x = minX; x <= maxX; x += 3) {
+            const s = nccAt(gray, w, h, x, y, m.patch);
+            if (s > bestScore) { bestScore = s; bx = x; by = y; }
+          }
+        }
+        // Refino fino (passo 1px em +/-3px)
+        const fx0 = Math.max(m.patch.half, bx - 3);
+        const fx1 = Math.min(w - m.patch.half - 1, bx + 3);
+        const fy0 = Math.max(m.patch.half, by - 3);
+        const fy1 = Math.min(h - m.patch.half - 1, by + 3);
+        for (let y = fy0; y <= fy1; y++) {
+          for (let x = fx0; x <= fx1; x++) {
+            const s = nccAt(gray, w, h, x, y, m.patch);
+            if (s > bestScore) { bestScore = s; bx = x; by = y; }
+          }
+        }
+
+        if (bestScore < 0.62) return { valid: false };
+
+        // Refino subpixel pelo centroide escuro
+        const sub = refineSquareCenter(gray, w, h, bx, by);
+        const dist = Math.hypot(sub.x - bx, sub.y - by);
+        const fx = dist < 4 ? sub.x : bx;
+        const fy = dist < 4 ? sub.y : by;
+
+        return { valid: true, x: fx, y: fy };
+      }
+
+      // Calcula transformação de similaridade 2D fechada (translação + rotação + escala)
+      function solveSimilarity(pairs) {
+        const n = pairs.length;
+        let qx = 0, qy = 0, px = 0, py = 0;
+        for (const pair of pairs) {
+          qx += pair.q.x; qy += pair.q.y;
+          px += pair.p.x; py += pair.p.y;
+        }
+        qx /= n; qy /= n; px /= n; py /= n;
+
+        let a = 0, b = 0, denom = 0;
+        for (const pair of pairs) {
+          const dqX = pair.q.x - qx, dqY = pair.q.y - qy;
+          const dpX = pair.p.x - px, dpY = pair.p.y - py;
+          a += dqX * dpX + dqY * dpY;
+          b += dqX * dpY - dqY * dpX;
+          denom += dqX * dqX + dqY * dqY;
+        }
+        if (denom < 1) return null;
+
+        const mCos = a / denom;
+        const mSin = b / denom;
+        const scale = Math.hypot(mCos, mSin);
+        if (scale < 0.25 || scale > 4.0) return null;
+
+        const dRot = Math.atan2(mSin, mCos);
+        return { qx, qy, px, py, mCos, mSin, scale, dRot };
+      }
+
+      function applySimilarityToPoint(sim, x, y) {
+        const dx = x - sim.qx;
+        const dy = y - sim.qy;
+        return {
+          x: sim.px + sim.mCos * dx - sim.mSin * dy,
+          y: sim.py + sim.mSin * dx + sim.mCos * dy
+        };
+      }
+
+      function processTrackingFrame() {
+        const gray = grabGrayscaleFrame();
+        const validPairs = [];
+
+        for (const m of markers) {
+          const res = trackSingleMarker(gray, m);
+          if (res.valid) {
+            m.valid = true;
+            m.vidX = res.x;
+            m.vidY = res.y;
+            const st = trackToStage(res.x, res.y);
+            m.curStageX = st.x;
+            m.curStageY = st.y;
+            validPairs.push({
+              marker: m,
+              q: { x: m.initStageX, y: m.initStageY },
+              p: { x: st.x, y: st.y }
+            });
+          } else {
+            m.valid = false;
+          }
+        }
+
+        // Rejeição de outlier caso 1 dos 4 pontos tenha sofrido interferência (ex: sombra/caneta)
+        let activePairs = validPairs;
+        if (validPairs.length >= 3) {
+          const simAll = solveSimilarity(validPairs);
+          if (simAll) {
+            let maxErr = 0, worstIdx = -1;
+            for (let i = 0; i < validPairs.length; i++) {
+              const pred = applySimilarityToPoint(simAll, validPairs[i].q.x, validPairs[i].q.y);
+              const err = Math.hypot(pred.x - validPairs[i].p.x, pred.y - validPairs[i].p.y);
+              if (err > maxErr) { maxErr = err; worstIdx = i; }
+            }
+            if (maxErr > 16 && worstIdx !== -1) {
+              const filtered = validPairs.filter((_, idx) => idx !== worstIdx);
+              const simClean = solveSimilarity(filtered);
+              if (simClean) activePairs = filtered;
+            }
+          }
+        }
+
+        const sim = activePairs.length >= 2 ? solveSimilarity(activePairs) : null;
+
+        if (sim) {
+          trackingLost = false;
+          trackingWarning.style.display = 'none';
+
+          // Atualiza pontos perdidos por predição para recuperarem rápido quando a mão sair
+          for (const m of markers) {
+            if (!m.valid) {
+              const predStage = applySimilarityToPoint(sim, m.initStageX, m.initStageY);
+              const predTrack = stageToTrack(predStage.x, predStage.y);
+              m.vidX = Math.max(0, Math.min(TRACK_W - 1, predTrack.x));
+              m.vidY = Math.max(0, Math.min(trackH - 1, predTrack.y));
+              m.curStageX = predStage.x;
+              m.curStageY = predStage.y;
+            }
+          }
+
+          // Atualiza a posição da referência relativa ao centro do stage
+          const initCenterX = stageW / 2 + refBase.x;
+          const initCenterY = stageH / 2 + refBase.y;
+          const newCenter = applySimilarityToPoint(sim, initCenterX, initCenterY);
+
+          const targetX = newCenter.x - stageW / 2;
+          const targetY = newCenter.y - stageH / 2;
+          const targetScale = refBase.scale * sim.scale;
+          const targetRot = refBase.rotation + sim.dRot;
+
+          // Pequeno deadband para eliminar micro-tremor do sensor sem atrasar o movimento
+          if (Math.hypot(targetX - refLive.x, targetY - refLive.y) > 0.35 ||
+              Math.abs(targetRot - refLive.rotation) > 0.002 ||
+              Math.abs(targetScale - refLive.scale) > 0.002) {
+            refLive.x = targetX;
+            refLive.y = targetY;
+            refLive.scale = targetScale;
+            refLive.rotation = targetRot;
+            applyTransforms();
+          }
+        } else {
+          trackingLost = true;
+          trackingWarning.textContent = 'Aviso: Rastreamento pausado. Mantenha pelo menos 2 quadrados pretos visíveis.';
+          trackingWarning.style.display = 'block';
+        }
+
+        updateLockUI();
+      }
+
+      function drawOverlay() {
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+        if (manualPicking) {
+          for (let i = 0; i < manualPickedVideoPts.length; i++) {
+            const st = trackToStage(manualPickedVideoPts[i].x, manualPickedVideoPts[i].y);
+            drawReticle(st.x, st.y, '#3b82f6', `${i + 1}`);
+          }
+          return;
+        }
+
+        if (isLocked) {
+          for (let i = 0; i < markers.length; i++) {
+            const m = markers[i];
+            const color = m.valid ? '#10b981' : '#f59e0b';
+            drawReticle(m.curStageX, m.curStageY, color, `${i + 1}`);
+          }
+        }
+      }
+
+      function drawReticle(x, y, color, label) {
+        overlayCtx.save();
+        overlayCtx.strokeStyle = color;
+        overlayCtx.lineWidth = 2;
+        overlayCtx.beginPath();
+        overlayCtx.arc(x, y, 12, 0, Math.PI * 2);
+        overlayCtx.stroke();
+
+        overlayCtx.fillStyle = color;
+        overlayCtx.font = 'bold 11px sans-serif';
+        overlayCtx.fillText(label, x + 15, y - 8);
+        overlayCtx.restore();
+      }
+
+      function startLoop() {
+        if (rafId) cancelAnimationFrame(rafId);
+        const tick = (now) => {
+          if (isLocked && cameraVideo.readyState >= 2 && now - lastTrackTime >= 45) {
+            lastTrackTime = now;
+            processTrackingFrame();
+          }
+          drawOverlay();
+          rafId = requestAnimationFrame(tick);
+        };
+        rafId = requestAnimationFrame(tick);
+      }
+    })();
+  </script>
+</body>
+</html>
