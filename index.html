@@ -18,7 +18,6 @@ button:active{filter:brightness(1.3)}
 #vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #ov{position:absolute;inset:0;overflow:hidden;touch-action:none;z-index:1}
 #ref{position:absolute;left:50%;top:50%;max-width:none;transform-origin:center;pointer-events:none;user-select:none;-webkit-user-drag:none}
-#dbg{position:absolute;inset:0;z-index:2;pointer-events:none}
 #bar{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;gap:6px;flex-wrap:wrap;padding:calc(env(safe-area-inset-top,0px) + 8px) 8px 8px}
 #bar button{padding:9px 12px;font-size:14px;background:rgba(18,20,26,.82)}
 #lk.on{background:var(--ac);color:#111;border-color:var(--ac);font-weight:600}
@@ -43,7 +42,6 @@ input[type=range]{width:100%;accent-color:var(--ac);height:30px}
 <div id="cam">
   <video id="vid" playsinline muted autoplay></video>
   <div id="ov"><img id="ref" alt=""></div>
-  <canvas id="dbg"></canvas>
   <div id="bar">
     <button id="bx" aria-label="Voltar">✕</button>
     <button id="lk">Travar na folha</button>
@@ -65,23 +63,28 @@ input[type=range]{width:100%;accent-color:var(--ac);height:30px}
 <script>
 const $=i=>document.getElementById(i);
 const S={x:0,y:0,s:1,r:0,o:.5};
-let url=null,stream=null,track=null,wl=null,lock=false,tm=null,prev=null,bad=0;
+let Zd=1,url=null,stream=null,track=null,wl=null,lock=false,tm=null,prev=null,bad=0;
 const vid=$('vid'),ref=$('ref'),ov=$('ov');
 
 function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2200)}
 function apply(){
-  ref.style.opacity=S.o;
+  vid.style.transform=`scale(${Zd})`;ref.style.opacity=S.o;
   ref.style.transform=`translate(-50%,-50%) translate(${S.x}px,${S.y}px) rotate(${S.r}rad) scale(${S.s})`;
   $('sO').value=S.o*100;$('sZ').value=S.s*100;$('sX').value=S.x;$('sY').value=S.y;
   $('vO').textContent=Math.round(S.o*100)+'%';$('vZ').textContent=Math.round(S.s*100)+'%';
   $('vX').textContent=Math.round(S.x);$('vY').textContent=Math.round(S.y);
 }
-function center(){S.x=0;S.y=0;S.s=1;S.r=0;apply()}
+function center(){S.x=0;S.y=0;S.s=1;S.r=0;Zd=1;apply()}
+function zoomBy(f){
+  let ns=Math.min(5,Math.max(.1,S.s*f));f=ns/S.s;
+  if(lock){const nz=Math.min(4,Math.max(1,Zd*f));f=nz/Zd;Zd=nz;S.x*=f;S.y*=f}
+  S.s*=f;
+}
 function ranges(){
   $('sX').min=-innerWidth;$('sX').max=innerWidth;$('sY').min=-innerHeight;$('sY').max=innerHeight;
 }
 $('sO').oninput=e=>{S.o=e.target.value/100;apply()};
-$('sZ').oninput=e=>{S.s=e.target.value/100;apply()};
+$('sZ').oninput=e=>{zoomBy(e.target.value/100/S.s);apply()};
 $('sX').oninput=e=>{S.x=+e.target.value;apply()};
 $('sY').oninput=e=>{S.y=+e.target.value;apply()};
 
@@ -108,7 +111,7 @@ ov.addEventListener('pointermove',e=>{
     let q=null;for(const [k,v] of P)if(k!==e.pointerId)q=v;
     const d0=Math.hypot(o[0]-q[0],o[1]-q[1])||1,d1=Math.hypot(n[0]-q[0],n[1]-q[1])||1;
     const a0=Math.atan2(o[1]-q[1],o[0]-q[0]),a1=Math.atan2(n[1]-q[1],n[0]-q[0]);
-    S.s=Math.min(5,Math.max(.1,S.s*d1/d0));
+    zoomBy(d1/d0);
     S.r+=a1-a0;
     S.x+=(n[0]-o[0])/2;S.y+=(n[1]-o[1])/2;
   }
@@ -160,7 +163,7 @@ function stopCam(){
   stream=null;track=null;vid.srcObject=null;
   if(wl){wl.release().catch(()=>{});wl=null}
 }
-$('bx').onclick=()=>{stopCam();$('cam').style.display='none';$('home').style.display='flex'};
+$('bx').onclick=()=>{stopCam();Zd=1;$('cam').style.display='none';$('home').style.display='flex'};
 async function getWake(){
   try{if('wakeLock' in navigator&&stream)wl=await navigator.wakeLock.request('screen')}catch(e){}
 }
@@ -209,15 +212,15 @@ function tick(){
     if(r.ok){
       bad=0;$('warn').style.display='none';
       const sc=Math.max(vid.clientWidth/vid.videoWidth,vid.clientHeight/vid.videoHeight);
-      const k=sc*vid.videoWidth/W;
+      const k=sc*vid.videoWidth/W*Zd;
       S.x+=r.du*k;S.y+=r.dv*k;apply();
     }else if(++bad>=3)$('warn').style.display='block';
   }
   prev=c;
 }
-/* rastreio por marcadores: quadrados pretos preenchidos, com mapa que cresce */
+/* rastreio por marcadores ⊕ (círculo com sinal de mais), com mapa que cresce */
 let mode='tex',K=[],cand=[],pose={x:0,y:0};
-const MW=128,mc=document.createElement('canvas'),mx=mc.getContext('2d',{willReadFrequently:true});
+const MW=160,mc=document.createElement('canvas'),mx=mc.getContext('2d',{willReadFrequently:true});
 function blobs(){
   const vw=vid.videoWidth,vh=vid.videoHeight;if(!vw)return null;
   const H=Math.round(MW*vh/vw);
@@ -227,6 +230,9 @@ function blobs(){
   for(let i=0,j=0;j<n;i+=4,j++){g[j]=(d[i]*77+d[i+1]*150+d[i+2]*29)>>8;h[g[j]]++}
   let c=0,pw=255;for(let v=0;v<256;v++){c+=h[v];if(c>=n*.9){pw=v;break}}
   const th=pw*.5,dk=new Uint8Array(n),out=[],st=[];
+  const dp=(x,y)=>{x=Math.round(x);y=Math.round(y);return x>=0&&y>=0&&x<MW&&y<H&&g[y*MW+x]<th};
+  const dn=(x,y)=>{for(let i=-1;i<2;i++)for(let j=-1;j<2;j++)if(dp(x+i,y+j))return true;return false};
+  const ring=(x,y,r,sx,sy)=>{for(let t=.75;t<=1.12;t+=.1)if(dn(x+sx*r*t,y+sy*r*t))return true;return false};
   for(let j=0;j<n;j++)dk[j]=g[j]<th?1:0;
   for(let s=0;s<n&&pw>60;s++){
     if(dk[s]!==1)continue;
@@ -242,17 +248,17 @@ function blobs(){
       if(y<H-1&&dk[p+MW]===1){dk[p+MW]=2;st.push(p+MW)}
     }
     const bw=x1-x0+1,bh=y1-y0+1,ar=bw/bh;
-    if(a>=16&&a<=700&&ar>.65&&ar<1.55&&a/(bw*bh)>.72&&x0>0&&y0>0&&x1<MW-1&&y1<H-1)out.push({x:sx/a+.5,y:sy/a+.5});
+    const cx=(x0+x1)/2,cy=(y0+y1)/2,r=Math.min(bw,bh)/2;
+    if(a>=20&&a<=1200&&bw>=9&&bw<=70&&ar>.75&&ar<1.33&&x0>0&&y0>0&&x1<MW-1&&y1<H-1&&dn(cx,cy)&&[[1,0],[-1,0],[0,1],[0,-1]].every(v=>dn(cx+v[0]*r*.5,cy+v[1]*r*.5))&&[[1,1],[1,-1],[-1,1],[-1,-1]].every(v=>!dp(cx+v[0]*r*.38,cy+v[1]*r*.38)&&ring(cx,cy,r,v[0]*.7071,v[1]*.7071)))out.push({x:sx/a+.5,y:sy/a+.5});
     if(out.length>=24)break;
   }
   return out;
 }
 const near=(e,px,py,r)=>Math.abs(e.x+px-r.x)<3&&Math.abs(e.y+py-r.y)<3;
 function mtick(){
-  const D=blobs(),cv2=$('dbg');if(!D)return;
+  const D=blobs();if(!D)return;
   const cw=vid.clientWidth,ch=vid.clientHeight;
-  if(cv2.width!==cw||cv2.height!==ch){cv2.width=cw;cv2.height=ch}
-  const sc=Math.max(cw/vid.videoWidth,ch/vid.videoHeight),k=sc*vid.videoWidth/MW;
+  const sc=Math.max(cw/vid.videoWidth,ch/vid.videoHeight),k=sc*vid.videoWidth/MW*Zd;
   const hit=new Set();let ok=false;
   if(lock){
     if(!K.length){D.forEach((d,i)=>{K.push({x:d.x+pose.x,y:d.y+pose.y});hit.add(i)});ok=D.length>0}
@@ -260,7 +266,7 @@ function mtick(){
       const trk=bad<6;let best=null,bn=0,bd=1e9;
       for(const d of D)for(const q of K){
         const px=q.x-d.x,py=q.y-d.y,dd=Math.hypot(px-pose.x,py-pose.y);
-        if(trk&&dd>16)continue;
+        if(trk&&dd>20)continue;
         let m=0;for(const e of D)for(const r of K)if(near(e,px,py,r)){m++;break}
         if(m>bn||(m===bn&&dd<bd)){bn=m;bd=dd;best=[px,py]}
       }
@@ -276,18 +282,14 @@ function mtick(){
     }
     if(ok){bad=0;$('warn').style.display='none'}else if(++bad>=3)$('warn').style.display='block';
   }
-  const g2=cv2.getContext('2d');g2.clearRect(0,0,cw,ch);g2.lineWidth=3;
-  const hh=MW*vid.videoHeight/vid.videoWidth;
-  D.forEach((d,i)=>{g2.strokeStyle=lock&&!hit.has(i)?'#ffb020':'#3ddc84';
-    g2.beginPath();g2.arc((d.x-MW/2)*k+cw/2,(d.y-hh/2)*k+ch/2,14,0,7);g2.stroke()});
+  $('bm').textContent='Rastreio: marcadores · ⊕ '+D.length;
 }
 function loop(){if(mode==='mk')mtick();else if(lock)tick()}
 $('bm').onclick=()=>{
   mode=mode==='tex'?'mk':'tex';
   $('bm').textContent=mode==='mk'?'Rastreio: marcadores':'Rastreio: textura';
-  const c=$('dbg');c.getContext('2d').clearRect(0,0,c.width,c.height);
   setLock(false);
-  toast(mode==='mk'?'Círculos verdes = marcadores detectados.':'Rastreio pela textura da folha.');
+  toast(mode==='mk'?'Desenhe o símbolo ⊕ na folha, fora do desenho.':'Rastreio pela textura da folha.');
 };
 function setLock(on){
   lock=on;prev=null;bad=0;K=[];cand=[];pose={x:0,y:0};
