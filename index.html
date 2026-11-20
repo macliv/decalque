@@ -18,6 +18,7 @@ button:active{filter:brightness(1.3)}
 #vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #ov{position:absolute;inset:0;overflow:hidden;touch-action:none;z-index:1}
 #ref{position:absolute;left:50%;top:50%;max-width:none;transform-origin:center;pointer-events:none;user-select:none;-webkit-user-drag:none}
+#dbg{position:absolute;inset:0;z-index:2;pointer-events:none}
 #bar{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;gap:6px;flex-wrap:wrap;padding:calc(env(safe-area-inset-top,0px) + 8px) 8px 8px}
 #bar button{padding:9px 12px;font-size:14px;background:rgba(18,20,26,.82)}
 #lk.on{background:var(--ac);color:#111;border-color:var(--ac);font-weight:600}
@@ -42,6 +43,7 @@ input[type=range]{width:100%;accent-color:var(--ac);height:30px}
 <div id="cam">
   <video id="vid" playsinline muted autoplay></video>
   <div id="ov"><img id="ref" alt=""></div>
+  <canvas id="dbg"></canvas>
   <div id="bar">
     <button id="bx" aria-label="Voltar">✕</button>
     <button id="lk">Travar na folha</button>
@@ -56,6 +58,7 @@ input[type=range]{width:100%;accent-color:var(--ac);height:30px}
     <div class="r"><span>Posição X</span><input type="range" id="sX" step="1"><span id="vX"></span></div>
     <div class="r"><span>Posição Y</span><input type="range" id="sY" step="1"><span id="vY"></span></div>
     <div class="r" id="rc" hidden><span>Zoom câmera</span><input type="range" id="sC"><span id="vC"></span></div>
+    <button id="bm">Rastreio: textura</button>
     <button id="bt">Trocar imagem</button>
   </div>
 </div>
@@ -135,7 +138,7 @@ $('bCam').onclick=async()=>{
   }catch(e){stopCam();showErr(errMsg(e));return}
   track=stream.getVideoTracks()[0];
   $('home').style.display='none';$('cam').style.display='block';
-  ranges();apply();setupZoom();getWake();
+  ranges();apply();setupZoom();getWake();clearInterval(tm);tm=setInterval(loop,90);
 };
 function setupZoom(){
   let c=null;try{c=track.getCapabilities&&track.getCapabilities()}catch(e){}
@@ -149,10 +152,10 @@ function setupZoom(){
 $('sC').oninput=async e=>{
   const v=+e.target.value;$('vC').textContent=v.toFixed(1)+'x';
   try{await track.applyConstraints({advanced:[{zoom:v}]})}catch(x){}
-  prev=null;
+  prev=null;if(lock)setLock(true);
 };
 function stopCam(){
-  setLock(false);
+  setLock(false);clearInterval(tm);
   if(stream)stream.getTracks().forEach(t=>t.stop());
   stream=null;track=null;vid.srcObject=null;
   if(wl){wl.release().catch(()=>{});wl=null}
@@ -212,12 +215,87 @@ function tick(){
   }
   prev=c;
 }
+/* rastreio por marcadores: quadrados pretos preenchidos, com mapa que cresce */
+let mode='tex',K=[],cand=[],pose={x:0,y:0};
+const MW=128,mc=document.createElement('canvas'),mx=mc.getContext('2d',{willReadFrequently:true});
+function blobs(){
+  const vw=vid.videoWidth,vh=vid.videoHeight;if(!vw)return null;
+  const H=Math.round(MW*vh/vw);
+  if(mc.width!==MW||mc.height!==H){mc.width=MW;mc.height=H}
+  mx.drawImage(vid,0,0,MW,H);
+  const d=mx.getImageData(0,0,MW,H).data,n=MW*H,g=new Uint8Array(n),h=new Uint32Array(256);
+  for(let i=0,j=0;j<n;i+=4,j++){g[j]=(d[i]*77+d[i+1]*150+d[i+2]*29)>>8;h[g[j]]++}
+  let c=0,pw=255;for(let v=0;v<256;v++){c+=h[v];if(c>=n*.9){pw=v;break}}
+  const th=pw*.5,dk=new Uint8Array(n),out=[],st=[];
+  for(let j=0;j<n;j++)dk[j]=g[j]<th?1:0;
+  for(let s=0;s<n&&pw>60;s++){
+    if(dk[s]!==1)continue;
+    dk[s]=2;st.length=0;st.push(s);
+    let a=0,sx=0,sy=0,x0=MW,x1=0,y0=H,y1=0;
+    while(st.length){
+      const p=st.pop(),x=p%MW,y=(p-x)/MW;
+      a++;sx+=x;sy+=y;
+      if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;
+      if(x>0&&dk[p-1]===1){dk[p-1]=2;st.push(p-1)}
+      if(x<MW-1&&dk[p+1]===1){dk[p+1]=2;st.push(p+1)}
+      if(y>0&&dk[p-MW]===1){dk[p-MW]=2;st.push(p-MW)}
+      if(y<H-1&&dk[p+MW]===1){dk[p+MW]=2;st.push(p+MW)}
+    }
+    const bw=x1-x0+1,bh=y1-y0+1,ar=bw/bh;
+    if(a>=16&&a<=700&&ar>.65&&ar<1.55&&a/(bw*bh)>.72&&x0>0&&y0>0&&x1<MW-1&&y1<H-1)out.push({x:sx/a+.5,y:sy/a+.5});
+    if(out.length>=24)break;
+  }
+  return out;
+}
+const near=(e,px,py,r)=>Math.abs(e.x+px-r.x)<3&&Math.abs(e.y+py-r.y)<3;
+function mtick(){
+  const D=blobs(),cv2=$('dbg');if(!D)return;
+  const cw=vid.clientWidth,ch=vid.clientHeight;
+  if(cv2.width!==cw||cv2.height!==ch){cv2.width=cw;cv2.height=ch}
+  const sc=Math.max(cw/vid.videoWidth,ch/vid.videoHeight),k=sc*vid.videoWidth/MW;
+  const hit=new Set();let ok=false;
+  if(lock){
+    if(!K.length){D.forEach((d,i)=>{K.push({x:d.x+pose.x,y:d.y+pose.y});hit.add(i)});ok=D.length>0}
+    else{
+      const trk=bad<6;let best=null,bn=0,bd=1e9;
+      for(const d of D)for(const q of K){
+        const px=q.x-d.x,py=q.y-d.y,dd=Math.hypot(px-pose.x,py-pose.y);
+        if(trk&&dd>16)continue;
+        let m=0;for(const e of D)for(const r of K)if(near(e,px,py,r)){m++;break}
+        if(m>bn||(m===bn&&dd<bd)){bn=m;bd=dd;best=[px,py]}
+      }
+      if(best&&bn>=(trk?1:2)){
+        let sx=0,sy=0,m=0;
+        D.forEach((e,i)=>{for(const r of K)if(near(e,best[0],best[1],r)){sx+=r.x-e.x;sy+=r.y-e.y;m++;hit.add(i);break}});
+        const nx=sx/m,ny=sy/m;
+        S.x+=(pose.x-nx)*k;S.y+=(pose.y-ny)*k;pose={x:nx,y:ny};apply();ok=true;
+        const nw=D.filter((e,i)=>!hit.has(i)).map(e=>({x:e.x+nx,y:e.y+ny}));
+        nw.forEach(a=>{if(cand.some(c=>Math.hypot(c.x-a.x,c.y-a.y)<2.5)&&!K.some(r=>Math.hypot(r.x-a.x,r.y-a.y)<4)&&K.length<150)K.push(a)});
+        cand=nw;
+      }
+    }
+    if(ok){bad=0;$('warn').style.display='none'}else if(++bad>=3)$('warn').style.display='block';
+  }
+  const g2=cv2.getContext('2d');g2.clearRect(0,0,cw,ch);g2.lineWidth=3;
+  const hh=MW*vid.videoHeight/vid.videoWidth;
+  D.forEach((d,i)=>{g2.strokeStyle=lock&&!hit.has(i)?'#ffb020':'#3ddc84';
+    g2.beginPath();g2.arc((d.x-MW/2)*k+cw/2,(d.y-hh/2)*k+ch/2,14,0,7);g2.stroke()});
+}
+function loop(){if(mode==='mk')mtick();else if(lock)tick()}
+$('bm').onclick=()=>{
+  mode=mode==='tex'?'mk':'tex';
+  $('bm').textContent=mode==='mk'?'Rastreio: marcadores':'Rastreio: textura';
+  const c=$('dbg');c.getContext('2d').clearRect(0,0,c.width,c.height);
+  setLock(false);
+  toast(mode==='mk'?'Círculos verdes = marcadores detectados.':'Rastreio pela textura da folha.');
+};
 function setLock(on){
-  lock=on;clearInterval(tm);prev=null;bad=0;
+  lock=on;prev=null;bad=0;K=[];cand=[];pose={x:0,y:0};
   $('lk').classList.toggle('on',on);
   $('lk').textContent=on?'Destravar':'Travar na folha';
+  $('warn').textContent=mode==='mk'?'⚠ Sem marcador conhecido à vista. Volte a um marcador.':'⚠ Perdi a folha. Volte a enquadrar o papel.';
   $('warn').style.display='none';
-  if(on){tm=setInterval(tick,90);toast('Travado. Pode mexer o celular.')}
+  if(on)toast('Travado. Pode mexer o celular.');
 }
 $('lk').onclick=()=>setLock(!lock);
 </script></body></html>
